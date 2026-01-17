@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { getAdminMe, getRentalSchedules, getRentalPayments, createRentalSchedule, updateRentalSchedule, deleteRentalSchedule, getAllMembers } from '@/lib/adminApi';
 import styles from '../admin.module.css';
 
@@ -291,7 +292,7 @@ export default function RentalsPage() {
             </p>
           </div>
           <div className={styles.headerActions}>
-            <a
+            <Link
               href="/admin/dashboard"
               style={{
                 padding: '10px 20px',
@@ -303,7 +304,7 @@ export default function RentalsPage() {
               }}
             >
               대시보드
-            </a>
+            </Link>
           </div>
         </div>
 

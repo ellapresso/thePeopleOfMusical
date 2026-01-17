@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import Link from 'next/link';
 import { getAdminMe, getAdminById, updateAdmin, getAllMembers } from '@/lib/adminApi';
 import styles from '../../../admin.module.css';
 import formStyles from '../../create/create.module.css';
@@ -217,7 +218,7 @@ export default function EditAdminPage() {
             <p style={{ color: '#666', marginBottom: '30px' }}>
               시스템 관리자만 admin 계정을 수정할 수 있습니다.
             </p>
-            <a
+            <Link
               href="/admin/admins"
               style={{
                 padding: '10px 20px',
@@ -230,7 +231,7 @@ export default function EditAdminPage() {
               }}
             >
               목록으로 돌아가기
-            </a>
+            </Link>
           </div>
         </div>
       </div>
@@ -251,7 +252,7 @@ export default function EditAdminPage() {
             </p>
           </div>
           <div className={styles.headerActions}>
-            <a
+            <Link
               href="/admin/admins"
               style={{
                 padding: '10px 20px',
@@ -263,7 +264,7 @@ export default function EditAdminPage() {
               }}
             >
               ← 목록으로
-            </a>
+            </Link>
           </div>
         </div>
 
@@ -525,7 +526,7 @@ export default function EditAdminPage() {
               >
                 {submitting ? '수정 중...' : success ? '수정 완료' : '수정하기'}
               </button>
-              <a
+              <Link
                 href="/admin/admins"
                 style={{
                   padding: '14px 30px',
@@ -539,7 +540,7 @@ export default function EditAdminPage() {
                 }}
               >
                 취소
-              </a>
+              </Link>
             </div>
           </form>
         </div>

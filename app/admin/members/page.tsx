@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { getAdminMe, getAllMembers } from '@/lib/adminApi';
 import styles from '../admin.module.css';
 
@@ -62,7 +63,7 @@ export default function MembersPage() {
             </p>
           </div>
           <div className={styles.headerActions}>
-            <a
+            <Link
               href="/admin/dashboard"
               style={{
                 padding: '10px 20px',
@@ -74,8 +75,8 @@ export default function MembersPage() {
               }}
             >
               대시보드
-            </a>
-            <a
+            </Link>
+            <Link
               href="/admin/members/create"
               style={{
                 padding: '10px 20px',
@@ -88,7 +89,7 @@ export default function MembersPage() {
               }}
             >
               + 단원 등록
-            </a>
+            </Link>
           </div>
         </div>
 
@@ -170,7 +171,7 @@ export default function MembersPage() {
                       color: '#666',
                       fontSize: '0.9rem',
                     }}>
-                      {member.memberLevel?.name} · {member.role?.name}
+                      {member.memberLevel?.name}
                     </div>
                   </div>
                 ))}
@@ -225,7 +226,6 @@ export default function MembersPage() {
                 <DetailRow label="생년월일" value={new Date(selectedMember.birthDate).toLocaleDateString('ko-KR')} />
                 <DetailRow label="전화번호" value={selectedMember.phone || '-'} />
                 <DetailRow label="단원 레벨" value={selectedMember.memberLevel?.name || '-'} />
-                <DetailRow label="역할" value={selectedMember.role?.name || '-'} />
                 <DetailRow label="프로필 공개" value={selectedMember.profileVisible ? '공개' : '비공개'} />
                 <DetailRow label="첫 가입일" value={new Date(selectedMember.firstJoinedAt).toLocaleDateString('ko-KR')} />
               </div>
@@ -237,7 +237,7 @@ export default function MembersPage() {
                 paddingTop: '25px',
                 borderTop: '1px solid #e0e0e0',
               }}>
-                <a
+                <Link
                   href={`/admin/members/${selectedMember.id}/edit`}
                   style={{
                     flex: 1,
@@ -252,7 +252,7 @@ export default function MembersPage() {
                   }}
                 >
                   수정
-                </a>
+                </Link>
                 <button
                   onClick={() => {
                     if (confirm(`정말로 "${selectedMember.name}" 단원을 삭제하시겠습니까?`)) {

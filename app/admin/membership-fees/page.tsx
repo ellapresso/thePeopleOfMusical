@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { getAdminMe, getMembershipFeePayments, getMembershipFeePolicies } from '@/lib/adminApi';
 import styles from '../admin.module.css';
 
@@ -62,7 +63,7 @@ export default function MembershipFeesPage() {
             </p>
           </div>
           <div className={styles.headerActions}>
-            <a
+            <Link
               href="/admin/dashboard"
               style={{
                 padding: '10px 20px',
@@ -74,7 +75,7 @@ export default function MembershipFeesPage() {
               }}
             >
               대시보드
-            </a>
+            </Link>
           </div>
         </div>
 
@@ -135,7 +136,7 @@ export default function MembershipFeesPage() {
               marginBottom: '20px',
             }}>
               <h2 style={{ margin: 0, fontSize: '1.3rem', color: '#333' }}>회비 정책</h2>
-              <a
+              <Link
                 href="/admin/membership-fees/policies/create"
                 style={{
                   padding: '10px 20px',
@@ -148,7 +149,7 @@ export default function MembershipFeesPage() {
                 }}
               >
                 + 정책 추가
-              </a>
+              </Link>
             </div>
             {policies.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
@@ -201,7 +202,7 @@ export default function MembershipFeesPage() {
               marginBottom: '20px',
             }}>
               <h2 style={{ margin: 0, fontSize: '1.3rem', color: '#333' }}>납부 내역</h2>
-              <a
+              <Link
                 href="/admin/membership-fees/payments/create"
                 style={{
                   padding: '10px 20px',
@@ -214,7 +215,7 @@ export default function MembershipFeesPage() {
                 }}
               >
                 + 납부 등록
-              </a>
+              </Link>
             </div>
             {payments.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
@@ -277,4 +278,5 @@ export default function MembershipFeesPage() {
     </div>
   );
 }
+
 

@@ -66,6 +66,12 @@ export const deleteMember = (id: number) =>
 // 단원 레벨
 export const getAllMemberLevels = () => apiRequest('/member-levels');
 export const getMemberLevelById = (id: number) => apiRequest(`/member-levels/${id}`);
+export const createMemberLevel = (data: any) =>
+  apiRequest('/member-levels', { method: 'POST', body: JSON.stringify(data) });
+export const updateMemberLevel = (id: number, data: any) =>
+  apiRequest(`/member-levels/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteMemberLevel = (id: number) =>
+  apiRequest(`/member-levels/${id}`, { method: 'DELETE' });
 
 // 역할
 export const getAllRoles = () => apiRequest('/roles');

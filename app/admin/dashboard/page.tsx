@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { getAdminMe, getAllMembers, getRegularMeetingSchedules, getSameDayRentalRequests } from '@/lib/adminApi';
 import styles from '../admin.module.css';
 
@@ -76,7 +77,7 @@ export default function AdminDashboard() {
             </p>
           </div>
           <div className={styles.headerActions}>
-            <a
+            <Link
               href="/"
               style={{
                 padding: '10px 20px',
@@ -88,7 +89,7 @@ export default function AdminDashboard() {
               }}
             >
               메인으로
-            </a>
+            </Link>
             <button
               onClick={handleLogout}
               style={{
@@ -166,7 +167,7 @@ function StatCard({ title, value, icon }: { title: string; value: number; icon: 
 
 function MenuCard({ title, description, href, icon }: { title: string; description: string; href: string; icon: string }) {
   return (
-    <a href={href} className={styles.menuCard}>
+    <Link href={href} className={styles.menuCard}>
       <div className={styles.menuIcon}>{icon}</div>
       <h3 className={styles.menuTitle}>
         {title}
@@ -174,7 +175,7 @@ function MenuCard({ title, description, href, icon }: { title: string; descripti
       <p className={styles.menuDescription}>
         {description}
       </p>
-    </a>
+    </Link>
   );
 }
 

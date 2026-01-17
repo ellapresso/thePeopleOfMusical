@@ -1,14 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { getAdminMe, createMember, getAllMemberLevels } from '@/lib/adminApi';
-import styles from '../../admin.module.css';
-import formStyles from './create.module.css';
+import { getAdminMe, getMemberById, updateMember, getAllMemberLevels } from '@/lib/adminApi';
+import styles from '../../../admin.module.css';
+import formStyles from '../../create/create.module.css';
 
-export default function CreateMemberPage() {
+export default function EditMemberPage() {
   const router = useRouter();
+  const params = useParams();
+  const memberId = parseInt(params.id as string);
+  
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -25,17 +28,23 @@ export default function CreateMemberPage() {
   });
 
   useEffect(() => {
-    checkAuth();
-    loadOptions();
-  }, []);
+    const initialize = async () => {
+      const authSuccess = await checkAuth();
+      if (authSuccess) {
+        await Promise.all([loadOptions(), loadMember()]);
+      }
+      setLoading(false);
+    };
+    initialize();
+  }, [memberId]);
 
   const checkAuth = async () => {
     try {
       await getAdminMe();
+      return true;
     } catch (error) {
       router.push('/admin/login');
-    } finally {
-      setLoading(false);
+      return false;
     }
   };
 
@@ -45,6 +54,27 @@ export default function CreateMemberPage() {
       setMemberLevels(levels);
     } catch (error) {
       console.error('Failed to load options:', error);
+    }
+  };
+
+  const loadMember = async () => {
+    try {
+      const data = await getMemberById(memberId);
+      
+      // 날짜를 YYYY-MM-DD 형식으로 변환
+      const birthDate = new Date(data.birthDate);
+      const firstJoinedAt = new Date(data.firstJoinedAt);
+      
+      setFormData({
+        name: data.name,
+        birthDate: birthDate.toISOString().split('T')[0],
+        phone: data.phone || '',
+        memberLevelId: data.memberLevelId.toString(),
+        profileVisible: data.profileVisible,
+        firstJoinedAt: firstJoinedAt.toISOString().split('T')[0],
+      });
+    } catch (error: any) {
+      setError(error.message || '단원 정보를 불러오는데 실패했습니다.');
     }
   };
 
@@ -76,7 +106,7 @@ export default function CreateMemberPage() {
     setSubmitting(true);
 
     try {
-      await createMember({
+      await updateMember(memberId, {
         name: formData.name,
         birthDate: new Date(formData.birthDate).toISOString(),
         phone: formData.phone || null,
@@ -90,7 +120,7 @@ export default function CreateMemberPage() {
         router.push('/admin/members');
       }, 2000);
     } catch (err: any) {
-      setError(err.message || '단원 등록에 실패했습니다.');
+      setError(err.message || '단원 정보 수정에 실패했습니다.');
     } finally {
       setSubmitting(false);
     }
@@ -111,10 +141,10 @@ export default function CreateMemberPage() {
         <div className={styles.header}>
           <div>
             <h1 className={styles.headerTitle}>
-              단원 등록
+              단원 정보 수정
             </h1>
             <p className={styles.headerSubtitle}>
-              새로운 단원을 등록합니다
+              단원 정보를 수정합니다
             </p>
           </div>
           <div className={styles.headerActions}>
@@ -150,7 +180,7 @@ export default function CreateMemberPage() {
               marginBottom: '20px',
               border: '1px solid #c3e6cb',
             }}>
-              ✅ 단원이 성공적으로 등록되었습니다. 목록 페이지로 이동합니다...
+              ✅ 단원 정보가 성공적으로 수정되었습니다. 목록 페이지로 이동합니다...
             </div>
           )}
 
@@ -281,7 +311,7 @@ export default function CreateMemberPage() {
                 disabled={submitting || success}
                 className={formStyles.submitButton}
               >
-                {submitting ? '등록 중...' : success ? '등록 완료' : '단원 등록'}
+                {submitting ? '수정 중...' : success ? '수정 완료' : '단원 정보 수정'}
               </button>
               <Link
                 href="/admin/members"

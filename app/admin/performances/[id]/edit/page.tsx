@@ -1,14 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { getAdminMe, createPerformance } from '@/lib/adminApi';
-import styles from '../../admin.module.css';
-import formStyles from './create.module.css';
+import { getAdminMe, getPerformanceById, updatePerformance } from '@/lib/adminApi';
+import styles from '../../../admin.module.css';
+import formStyles from '../../create/create.module.css';
 
-export default function CreatePerformancePage() {
+export default function EditPerformancePage() {
   const router = useRouter();
+  const params = useParams();
+  const performanceId = parseInt(params.id as string);
+  
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -19,21 +22,60 @@ export default function CreatePerformancePage() {
     startDate: '',
     endDate: '',
   });
-  const [sessions, setSessions] = useState<Array<{ sessionDate: string; sessionTime: string; note: string }>>([
-    { sessionDate: '', sessionTime: '', note: '' },
-  ]);
+  const [sessions, setSessions] = useState<Array<{ id?: number; sessionDate: string; sessionTime: string; note: string }>>([]);
 
   useEffect(() => {
-    checkAuth();
-  }, []);
+    const initialize = async () => {
+      const authSuccess = await checkAuth();
+      if (authSuccess) {
+        await loadPerformance();
+      }
+      setLoading(false);
+    };
+    initialize();
+  }, [performanceId]);
 
   const checkAuth = async () => {
     try {
       await getAdminMe();
+      return true;
     } catch (error) {
       router.push('/admin/login');
-    } finally {
-      setLoading(false);
+      return false;
+    }
+  };
+
+  const loadPerformance = async () => {
+    try {
+      const data = await getPerformanceById(performanceId);
+      
+      // 날짜를 YYYY-MM-DD 형식으로 변환
+      const startDate = new Date(data.startDate);
+      const endDate = new Date(data.endDate);
+      
+      setFormData({
+        title: data.title,
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0],
+      });
+
+      // 회차 정보 변환
+      if (data.sessions && data.sessions.length > 0) {
+        const formattedSessions = data.sessions.map((session: any) => {
+          const sessionDate = new Date(session.sessionDatetime);
+          return {
+            id: session.id,
+            sessionDate: sessionDate.toISOString().split('T')[0],
+            sessionTime: sessionDate.toTimeString().slice(0, 5), // HH:MM 형식
+            note: session.note || '',
+          };
+        });
+        setSessions(formattedSessions);
+      } else {
+        setSessions([{ sessionDate: '', sessionTime: '', note: '' }]);
+      }
+    } catch (error: any) {
+      setError(error.message || '공연 정보를 불러오는데 실패했습니다.');
     }
   };
 
@@ -103,7 +145,7 @@ export default function CreatePerformancePage() {
     setSubmitting(true);
 
     try {
-      await createPerformance({
+      await updatePerformance(performanceId, {
         title: formData.title,
         startDate: new Date(formData.startDate).toISOString(),
         endDate: new Date(formData.endDate).toISOString(),
@@ -115,7 +157,7 @@ export default function CreatePerformancePage() {
         router.push('/admin/performances');
       }, 2000);
     } catch (err: any) {
-      setError(err.message || '공연 등록에 실패했습니다.');
+      setError(err.message || '공연 수정에 실패했습니다.');
     } finally {
       setSubmitting(false);
     }
@@ -136,10 +178,10 @@ export default function CreatePerformancePage() {
         <div className={styles.header}>
           <div>
             <h1 className={styles.headerTitle}>
-              공연 등록
+              공연 정보 수정
             </h1>
             <p className={styles.headerSubtitle}>
-              새로운 공연을 등록합니다
+              공연 정보 및 회차를 수정합니다
             </p>
           </div>
           <div className={styles.headerActions}>
@@ -175,7 +217,7 @@ export default function CreatePerformancePage() {
               marginBottom: '20px',
               border: '1px solid #c3e6cb',
             }}>
-              ✅ 공연이 성공적으로 등록되었습니다. 목록 페이지로 이동합니다...
+              ✅ 공연 정보가 성공적으로 수정되었습니다. 목록 페이지로 이동합니다...
             </div>
           )}
 
@@ -273,7 +315,7 @@ export default function CreatePerformancePage() {
               
               {sessions.map((session, index) => (
                 <div
-                  key={index}
+                  key={session.id || index}
                   style={{
                     padding: '15px',
                     border: '1px solid #e0e0e0',
@@ -375,7 +417,7 @@ export default function CreatePerformancePage() {
                 disabled={submitting || success}
                 className={formStyles.submitButton}
               >
-                {submitting ? '등록 중...' : success ? '등록 완료' : '공연 등록'}
+                {submitting ? '수정 중...' : success ? '수정 완료' : '공연 정보 수정'}
               </button>
               <Link
                 href="/admin/performances"
@@ -399,5 +441,4 @@ export default function CreatePerformancePage() {
     </div>
   );
 }
-
 

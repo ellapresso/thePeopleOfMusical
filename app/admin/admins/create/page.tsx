@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { getAdminMe, getAllMembers } from '@/lib/adminApi';
 import styles from '../../admin.module.css';
 import formStyles from './create.module.css';
@@ -185,7 +186,7 @@ export default function CreateAdminPage() {
             </p>
           </div>
           <div className={styles.headerActions}>
-            <a
+            <Link
               href="/admin/admins"
               style={{
                 padding: '10px 20px',
@@ -197,7 +198,7 @@ export default function CreateAdminPage() {
               }}
             >
               ← 목록으로
-            </a>
+            </Link>
           </div>
         </div>
 
@@ -444,7 +445,7 @@ export default function CreateAdminPage() {
               >
                 {submitting ? '생성 중...' : success ? '생성 완료' : '관리자 생성'}
               </button>
-              <a
+              <Link
                 href="/admin/admins"
                 style={{
                   padding: '14px 30px',
@@ -458,7 +459,7 @@ export default function CreateAdminPage() {
                 }}
               >
                 취소
-              </a>
+              </Link>
             </div>
           </form>
         </div>

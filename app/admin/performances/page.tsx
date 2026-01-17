@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { getAdminMe, getAllPerformances, deletePerformance } from '@/lib/adminApi';
 import styles from '../admin.module.css';
 
@@ -74,7 +75,7 @@ export default function PerformancesPage() {
             </p>
           </div>
           <div className={styles.headerActions}>
-            <a
+            <Link
               href="/admin/dashboard"
               style={{
                 padding: '10px 20px',
@@ -86,8 +87,8 @@ export default function PerformancesPage() {
               }}
             >
               대시보드
-            </a>
-            <a
+            </Link>
+            <Link
               href="/admin/performances/create"
               style={{
                 padding: '10px 20px',
@@ -100,7 +101,7 @@ export default function PerformancesPage() {
               }}
             >
               + 공연 등록
-            </a>
+            </Link>
           </div>
         </div>
 
@@ -287,7 +288,7 @@ export default function PerformancesPage() {
                 paddingTop: '25px',
                 borderTop: '1px solid #e0e0e0',
               }}>
-                <a
+                <Link
                   href={`/admin/performances/${selectedPerformance.id}/edit`}
                   style={{
                     flex: 1,
@@ -302,7 +303,7 @@ export default function PerformancesPage() {
                   }}
                 >
                   수정
-                </a>
+                </Link>
                 <button
                   onClick={() => handleDelete(selectedPerformance.id, selectedPerformance.title)}
                   style={{
@@ -341,4 +342,5 @@ function DetailRow({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
 
