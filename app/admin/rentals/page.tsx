@@ -280,7 +280,6 @@ export default function RentalsPage() {
   return (
     <div className={styles.container}>
       <div className={styles.content}>
-      <div className={styles.content}>
         {/* 헤더 */}
         <div className={styles.header}>
           <div>
@@ -993,8 +992,6 @@ export default function RentalsPage() {
             </div>
           </div>
         )}
-      </div>
-    </div>
       </div>
     </div>
   );

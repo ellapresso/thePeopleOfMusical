@@ -51,45 +51,44 @@ export default function MembersPage() {
   return (
     <div className={styles.container}>
       <div className={styles.content}>
-          {/* 헤더 */}
-          <div className={styles.header}>
-            <div>
-              <h1 className={styles.headerTitle}>
-                단원 정보
-              </h1>
-              <p className={styles.headerSubtitle}>
-                등록된 단원 정보 관리
-              </p>
-            </div>
-            <div className={styles.headerActions}>
-              <a
-                href="/admin/dashboard"
-                style={{
-                  padding: '10px 20px',
-                  background: '#f5f5f5',
-                  color: '#333',
-                  borderRadius: '8px',
-                  textDecoration: 'none',
-                  fontSize: '0.9rem',
-                }}
-              >
-                대시보드
-              </a>
-              <a
-                href="/admin/members/create"
-                style={{
-                  padding: '10px 20px',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  color: 'white',
-                  borderRadius: '8px',
-                  textDecoration: 'none',
-                  fontSize: '0.9rem',
-                  fontWeight: '600',
-                }}
-              >
-                + 단원 등록
-              </a>
-            </div>
+        {/* 헤더 */}
+        <div className={styles.header}>
+          <div>
+            <h1 className={styles.headerTitle}>
+              단원 정보
+            </h1>
+            <p className={styles.headerSubtitle}>
+              등록된 단원 정보 관리
+            </p>
+          </div>
+          <div className={styles.headerActions}>
+            <a
+              href="/admin/dashboard"
+              style={{
+                padding: '10px 20px',
+                background: '#f5f5f5',
+                color: '#333',
+                borderRadius: '8px',
+                textDecoration: 'none',
+                fontSize: '0.9rem',
+              }}
+            >
+              대시보드
+            </a>
+            <a
+              href="/admin/members/create"
+              style={{
+                padding: '10px 20px',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                borderRadius: '8px',
+                textDecoration: 'none',
+                fontSize: '0.9rem',
+                fontWeight: '600',
+              }}
+            >
+              + 단원 등록
+            </a>
           </div>
         </div>
 
