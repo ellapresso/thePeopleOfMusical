@@ -5,25 +5,25 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import * as Tabs from '@radix-ui/react-tabs';
 import * as Dialog from '@radix-ui/react-dialog';
-import { getAdminMe, getAllAdmins, deleteAdmin, getAllMemberLevels, createMemberLevel, updateMemberLevel, deleteMemberLevel, getAllRoles, createRole, updateRole, deleteRole } from '@/lib/adminApi';
+import { getAllAdmins, deleteAdmin, getAllMemberLevels, createMemberLevel, updateMemberLevel, deleteMemberLevel, getAllRoles, createRole, updateRole, deleteRole } from '@/lib/adminApi';
+import { useAdmin } from '@/contexts/AdminContext';
 import styles from '../admin.module.css';
 
 export default function AdminsPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
+  const { currentAdmin, isAuthenticated, isSystemAdmin, loading: authLoading } = useAdmin();
   const [processing, setProcessing] = useState(false);
   const [activeTab, setActiveTab] = useState('admins');
   const [admins, setAdmins] = useState<any[]>([]);
   const [memberLevels, setMemberLevels] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
-  const [currentAdmin, setCurrentAdmin] = useState<any>(null);
   const [editingLevel, setEditingLevel] = useState<any>(null);
   const [editingRole, setEditingRole] = useState<any>(null);
   const [showLevelForm, setShowLevelForm] = useState(false);
   const [showRoleForm, setShowRoleForm] = useState(false);
   const [levelFormData, setLevelFormData] = useState({ name: '', description: '' });
   const [roleFormData, setRoleFormData] = useState({ code: '', name: '', description: '' });
-  
+
   // 모달 상태
   const [modalOpen, setModalOpen] = useState(false);
   const [modalType, setModalType] = useState<'info' | 'confirm' | 'error'>('info');
@@ -33,68 +33,57 @@ export default function AdminsPage() {
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'admin' | 'level' | 'role'; id: number; name: string; loginId?: string } | null>(null);
 
   useEffect(() => {
-    const initialize = async () => {
-      await checkAuth();
+    // 인증 확인 (Context에서 처리됨)
+    if (!authLoading && !isAuthenticated) {
+      router.push('/admin/login');
+      return;
+    }
+
+    // 데이터 로딩은 백그라운드에서 처리 (즉시 UI 표시)
+    const loadData = async () => {
       await Promise.all([
         loadAdmins(),
         loadMemberLevels(),
       ]);
-    };
-    initialize();
-  }, []);
 
-
-  const checkAuth = async () => {
-    try {
-      const adminData = await getAdminMe();
-      setCurrentAdmin(adminData);
       // 시스템 관리자인 경우 역할 목록도 로드
-      if (adminData?.adminType === 'SYSTEM') {
+      if (isSystemAdmin) {
         loadRoles();
       }
-    } catch (error) {
-      router.push('/admin/login');
-    } finally {
-      setLoading(false);
+    };
+
+    if (isAuthenticated) {
+      loadData();
     }
-  };
+  }, [isAuthenticated, isSystemAdmin, authLoading]);
 
   const loadAdmins = async () => {
     try {
-      setProcessing(true);
       const data = await getAllAdmins();
       setAdmins(data);
     } catch (error) {
       console.error('Failed to load admins:', error);
       showModal('error', '오류', '관리자 목록을 불러오는데 실패했습니다.');
-    } finally {
-      setProcessing(false);
     }
   };
 
   const loadMemberLevels = async () => {
     try {
-      setProcessing(true);
       const data = await getAllMemberLevels();
       setMemberLevels(data);
     } catch (error) {
       console.error('Failed to load member levels:', error);
       showModal('error', '오류', '단원 레벨 목록을 불러오는데 실패했습니다.');
-    } finally {
-      setProcessing(false);
     }
   };
 
   const loadRoles = async () => {
     try {
-      setProcessing(true);
       const data = await getAllRoles();
       setRoles(data);
     } catch (error) {
       console.error('Failed to load roles:', error);
       showModal('error', '오류', '역할 목록을 불러오는데 실패했습니다.');
-    } finally {
-      setProcessing(false);
     }
   };
 
@@ -121,7 +110,7 @@ export default function AdminsPage() {
 
   const handleDeleteClick = (id: number, name: string, loginId: string) => {
     // admin 계정은 시스템 관리자만 삭제 가능
-    if (loginId === 'admin' && currentAdmin?.adminType !== 'SYSTEM') {
+    if (loginId === 'admin' && !isSystemAdmin) {
       showModal('error', '권한 없음', '시스템 관리자만 admin 계정을 삭제할 수 있습니다.');
       return;
     }
@@ -256,7 +245,8 @@ export default function AdminsPage() {
     setRoleFormData({ code: '', name: '', description: '' });
   };
 
-  if (loading) {
+  // 인증 로딩이 완료되지 않았을 때만 로딩 화면 표시 (데이터는 백그라운드에서 로드)
+  if (authLoading) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div>로딩 중...</div>
@@ -351,7 +341,7 @@ export default function AdminsPage() {
                 + 단원 레벨 등록
               </button>
             )}
-            {activeTab === 'roles' && !showRoleForm && currentAdmin?.adminType === 'SYSTEM' && (
+            {activeTab === 'roles' && !showRoleForm && isSystemAdmin && (
               <button
                 onClick={() => {
                   setEditingRole(null);
@@ -415,7 +405,7 @@ export default function AdminsPage() {
             >
               단원 레벨 관리
             </Tabs.Trigger>
-            {currentAdmin?.adminType === 'SYSTEM' && (
+            {isSystemAdmin && (
               <Tabs.Trigger
                 value="roles"
                 style={{
@@ -515,7 +505,7 @@ export default function AdminsPage() {
                         gap: '10px',
                         flexWrap: 'wrap',
                       }}>
-                        {admin.loginId === 'admin' && currentAdmin?.adminType !== 'SYSTEM' ? (
+                        {admin.loginId === 'admin' && !isSystemAdmin ? (
                           <div style={{
                             padding: '8px 16px',
                             background: '#f5f5f5',
@@ -543,16 +533,16 @@ export default function AdminsPage() {
                             </Link>
                             <button
                               onClick={() => handleDeleteClick(admin.id, admin.name, admin.loginId)}
-                              disabled={admin.loginId === 'admin' && currentAdmin?.adminType !== 'SYSTEM' || processing}
+                              disabled={admin.loginId === 'admin' && !isSystemAdmin || processing}
                               style={{
                                 padding: '8px 16px',
-                                background: admin.loginId === 'admin' && currentAdmin?.adminType !== 'SYSTEM' ? '#ccc' : '#dc3545',
+                                background: admin.loginId === 'admin' && !isSystemAdmin ? '#ccc' : '#dc3545',
                                 color: 'white',
                                 border: 'none',
                                 borderRadius: '8px',
-                                cursor: admin.loginId === 'admin' && currentAdmin?.adminType !== 'SYSTEM' || processing ? 'not-allowed' : 'pointer',
+                                cursor: admin.loginId === 'admin' && !isSystemAdmin || processing ? 'not-allowed' : 'pointer',
                                 fontSize: '0.9rem',
-                                opacity: admin.loginId === 'admin' && currentAdmin?.adminType !== 'SYSTEM' || processing ? 0.6 : 1,
+                                opacity: admin.loginId === 'admin' && !isSystemAdmin || processing ? 0.6 : 1,
                               }}
                             >
                               삭제
@@ -744,7 +734,7 @@ export default function AdminsPage() {
           </Tabs.Content>
 
           {/* 역할 관리 탭 (시스템 관리자만) */}
-          {currentAdmin?.adminType === 'SYSTEM' && (
+          {isSystemAdmin && (
             <Tabs.Content value="roles">
               <div style={{
                 background: 'white',

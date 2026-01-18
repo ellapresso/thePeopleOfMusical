@@ -3,13 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getAdminMe, getAllMembers, getRegularMeetingSchedules, getSameDayRentalRequests } from '@/lib/adminApi';
+import { getAllMembers, getRegularMeetingSchedules, getSameDayRentalRequests } from '@/lib/adminApi';
+import { useAdmin } from '@/contexts/AdminContext';
 import styles from '../admin.module.css';
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [admin, setAdmin] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const { currentAdmin: admin, isAuthenticated, loading: authLoading } = useAdmin();
   const [stats, setStats] = useState({
     totalMembers: 0,
     totalMeetings: 0,
@@ -17,20 +17,17 @@ export default function AdminDashboard() {
   });
 
   useEffect(() => {
-    checkAuth();
-    loadStats();
-  }, []);
-
-  const checkAuth = async () => {
-    try {
-      const adminData = await getAdminMe();
-      setAdmin(adminData);
-    } catch (error) {
+    // 인증 확인 (Context에서 처리됨)
+    if (!authLoading && !isAuthenticated) {
       router.push('/admin/login');
-    } finally {
-      setLoading(false);
+      return;
     }
-  };
+
+    // 데이터 로딩은 백그라운드에서 처리 (즉시 UI 표시)
+    if (isAuthenticated) {
+      loadStats();
+    }
+  }, [isAuthenticated, authLoading]);
 
   const loadStats = async () => {
     try {
@@ -55,7 +52,8 @@ export default function AdminDashboard() {
     router.push('/admin/login');
   };
 
-  if (loading) {
+  // 인증 로딩이 완료되지 않았을 때만 로딩 화면 표시
+  if (authLoading) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div>로딩 중...</div>

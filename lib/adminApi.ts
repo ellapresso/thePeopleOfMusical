@@ -162,6 +162,12 @@ export const updateMembershipFeePolicy = (id: number, data: any) =>
 export const deleteMembershipFeePolicy = (id: number) =>
   apiRequest(`/membership-fee-policies/${id}`, { method: 'DELETE' });
 
+// 회비 납부
+export const createMembershipFeePayment = (data: any) =>
+  apiRequest('/membership-fee-payments', { method: 'POST', body: JSON.stringify(data) });
+export const updateMembershipFeePayment = (id: number, data: any) =>
+  apiRequest(`/membership-fee-payments/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+
 // 공연 정보
 export const getAllPerformances = () => apiRequest('/performances');
 export const getPerformanceById = (id: number) => apiRequest(`/performances/${id}`);
