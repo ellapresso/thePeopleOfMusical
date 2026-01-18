@@ -124,6 +124,7 @@ export const deleteRole = (id: number) =>
 
 // 정기모임 스케줄
 export const getRegularMeetingSchedules = () => apiRequest('/regular-meeting-schedules', {}, true);
+export const getRegularMeetingScheduleById = (id: number) => apiRequest(`/regular-meeting-schedules/${id}`);
 export const createRegularMeetingSchedule = async (data: any) => {
   invalidateCachePattern('/regular-meeting-schedules');
   return apiRequest('/regular-meeting-schedules', { method: 'POST', body: JSON.stringify(data) });

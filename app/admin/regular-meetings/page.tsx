@@ -258,14 +258,37 @@ export default function RegularMeetingsPage() {
                           textAlign: 'center',
                           color: '#666',
                         }}>
-                          {new Date(schedule.meetingDate).toLocaleDateString('ko-KR')}
+                          {(() => {
+                            const date = typeof schedule.meetingDate === 'string' 
+                              ? schedule.meetingDate.split('T')[0] 
+                              : new Date(schedule.meetingDate);
+                            const dateStr = typeof date === 'string' 
+                              ? date 
+                              : date.toISOString().split('T')[0];
+                            const [year, month, day] = dateStr.split('-');
+                            return `${year}.${month}.${day}`;
+                          })()}
                         </td>
                         <td style={{
                           padding: '12px',
                           textAlign: 'center',
                           color: '#666',
                         }}>
-                          {new Date(`2000-01-01T${schedule.startTime}`).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} - {new Date(`2000-01-01T${schedule.endTime}`).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                          {(() => {
+                            const formatTime = (timeStr: string | Date) => {
+                              if (typeof timeStr === 'string') {
+                                const match = timeStr.match(/(\d{2}):(\d{2})/);
+                                if (match) return `${match[1]}:${match[2]}`;
+                                return timeStr.substring(0, 5);
+                              }
+                              const hours = timeStr.getHours().toString().padStart(2, '0');
+                              const minutes = timeStr.getMinutes().toString().padStart(2, '0');
+                              return `${hours}:${minutes}`;
+                            };
+                            const startTime = formatTime(schedule.startTime);
+                            const endTime = formatTime(schedule.endTime);
+                            return `${startTime} - ${endTime}`;
+                          })()}
                         </td>
                         <td style={{
                           padding: '12px',
@@ -304,6 +327,22 @@ export default function RegularMeetingsPage() {
                             >
                               참석인원
                             </button>
+                            <Link
+                              href={`/admin/regular-meetings/${schedule.id}/edit`}
+                              prefetch={true}
+                              style={{
+                                padding: '6px 12px',
+                                background: '#28a745',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                textDecoration: 'none',
+                                fontSize: '0.85rem',
+                                display: 'inline-block',
+                              }}
+                            >
+                              수정
+                            </Link>
                             <button
                               onClick={() => handleDeleteClick(schedule.id, schedule.meetingName, 'schedule')}
                               disabled={processing}
@@ -434,26 +473,24 @@ function AttendanceModal({ schedule, onClose, onUpdate, processing }: {
   processing: boolean;
 }) {
   const [attendances, setAttendances] = useState<any[]>(schedule.attendances || []);
-  const [showAddForm, setShowAddForm] = useState(false);
   const [members, setMembers] = useState<any[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [formData, setFormData] = useState({
-    memberId: '',
-    attendanceStatus: 'attended',
-    memo: '',
-  });
+  const [submitting, setSubmitting] = useState<Record<number, boolean>>({});
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadMembers();
     loadAttendances();
-  }, []);
+  }, [schedule.id]);
 
   const loadMembers = async () => {
     try {
+      setLoading(true);
       const data = await getAllMembers();
       setMembers(data);
     } catch (error) {
       console.error('Failed to load members:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -466,24 +503,43 @@ function AttendanceModal({ schedule, onClose, onUpdate, processing }: {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const isMemberChecked = (memberId: number) => {
+    return attendances.some((attendance: any) => attendance.memberId === memberId);
+  };
+
+  const handleCheckboxChange = async (memberId: number, checked: boolean) => {
+    const existingAttendance = attendances.find((attendance: any) => attendance.memberId === memberId);
+
     try {
-      setSubmitting(true);
-      await createRegularMeetingAttendance({
-        regularMeetingScheduleId: schedule.id,
-        memberId: parseInt(formData.memberId),
-        attendanceStatus: formData.attendanceStatus,
-        memo: formData.memo || null,
-      });
+      setSubmitting(prev => ({ ...prev, [memberId]: true }));
+
+      if (checked) {
+        // 체크박스 선택 시 참석 등록
+        if (!existingAttendance) {
+          await createRegularMeetingAttendance({
+            regularMeetingScheduleId: schedule.id,
+            memberId: memberId,
+            attendanceStatus: 'attended',
+            memo: null,
+          });
+        }
+      } else {
+        // 체크박스 해제 시 참석 삭제
+        if (existingAttendance) {
+          await deleteRegularMeetingAttendance(existingAttendance.id);
+        }
+      }
+
       await loadAttendances();
-      setShowAddForm(false);
-      setFormData({ memberId: '', attendanceStatus: 'attended', memo: '' });
       onUpdate();
     } catch (error: any) {
-      alert(error.message || '참석 등록에 실패했습니다.');
+      alert(error.message || (checked ? '참석 등록에 실패했습니다.' : '참석 삭제에 실패했습니다.'));
     } finally {
-      setSubmitting(false);
+      setSubmitting(prev => {
+        const next = { ...prev };
+        delete next[memberId];
+        return next;
+      });
     }
   };
 
@@ -523,273 +579,113 @@ function AttendanceModal({ schedule, onClose, onUpdate, processing }: {
             marginBottom: '20px',
             color: '#666',
           }}>
-            {new Date(schedule.meetingDate).toLocaleDateString('ko-KR')} {new Date(`2000-01-01T${schedule.startTime}`).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+            {(() => {
+              const date = typeof schedule.meetingDate === 'string' 
+                ? schedule.meetingDate.split('T')[0] 
+                : new Date(schedule.meetingDate);
+              const dateStr = typeof date === 'string' 
+                ? date 
+                : date.toISOString().split('T')[0];
+              const [year, month, day] = dateStr.split('-');
+              const formatTime = (timeStr: string | Date) => {
+                if (typeof timeStr === 'string') {
+                  const match = timeStr.match(/(\d{2}):(\d{2})/);
+                  if (match) return `${match[1]}:${match[2]}`;
+                  return timeStr.substring(0, 5);
+                }
+                const hours = timeStr.getHours().toString().padStart(2, '0');
+                const minutes = timeStr.getMinutes().toString().padStart(2, '0');
+                return `${hours}:${minutes}`;
+              };
+              return `${year}.${month}.${day} ${formatTime(schedule.startTime)}`;
+            })()}
           </Dialog.Description>
 
-          <div style={{ marginBottom: '20px' }}>
-            <button
-              onClick={() => setShowAddForm(!showAddForm)}
-              style={{
-                padding: '8px 16px',
-                background: showAddForm ? '#f5f5f5' : '#667eea',
-                color: showAddForm ? '#333' : 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '0.9rem',
-                fontWeight: '600',
-              }}
-            >
-              {showAddForm ? '취소' : '+ 참석 인원 추가'}
-            </button>
-          </div>
-
-          {showAddForm && (
-            <form onSubmit={handleSubmit} style={{
-              padding: '20px',
-              background: '#f8f9fa',
+          {loading ? (
+            <div style={{
+              padding: '40px',
+              textAlign: 'center',
+              color: '#999',
+            }}>
+              로딩 중...
+            </div>
+          ) : (
+            <div style={{
+              maxHeight: '60vh',
+              overflowY: 'auto',
+              border: '1px solid #e0e0e0',
               borderRadius: '8px',
-              marginBottom: '20px',
+              padding: '12px',
             }}>
-              <div style={{ marginBottom: '15px' }}>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '5px',
-                  fontWeight: '600',
-                  color: '#333',
-                  fontSize: '0.9rem',
+              {members.length === 0 ? (
+                <div style={{
+                  padding: '20px',
+                  textAlign: 'center',
+                  color: '#999',
                 }}>
-                  회원 <span style={{ color: '#dc3545' }}>*</span>
-                </label>
-                <select
-                  value={formData.memberId}
-                  onChange={(e) => setFormData({ ...formData, memberId: e.target.value })}
-                  required
-                  disabled={submitting}
-                  style={{
-                    width: '100%',
-                    padding: '8px',
-                    border: '1px solid #ddd',
-                    borderRadius: '6px',
-                    fontSize: '0.9rem',
-                  }}
-                >
-                  <option value="">선택하세요</option>
-                  {members.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{ marginBottom: '15px' }}>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '5px',
-                  fontWeight: '600',
-                  color: '#333',
-                  fontSize: '0.9rem',
-                }}>
-                  출석 상태 <span style={{ color: '#dc3545' }}>*</span>
-                </label>
-                <select
-                  value={formData.attendanceStatus}
-                  onChange={(e) => setFormData({ ...formData, attendanceStatus: e.target.value })}
-                  required
-                  disabled={submitting}
-                  style={{
-                    width: '100%',
-                    padding: '8px',
-                    border: '1px solid #ddd',
-                    borderRadius: '6px',
-                    fontSize: '0.9rem',
-                  }}
-                >
-                  <option value="attended">출석</option>
-                  <option value="absent">결석</option>
-                  <option value="late">지각</option>
-                </select>
-              </div>
-
-              <div style={{ marginBottom: '15px' }}>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '5px',
-                  fontWeight: '600',
-                  color: '#333',
-                  fontSize: '0.9rem',
-                }}>
-                  메모
-                </label>
-                <textarea
-                  value={formData.memo}
-                  onChange={(e) => setFormData({ ...formData, memo: e.target.value })}
-                  disabled={submitting}
-                  rows={2}
-                  style={{
-                    width: '100%',
-                    padding: '8px',
-                    border: '1px solid #ddd',
-                    borderRadius: '6px',
-                    fontSize: '0.9rem',
-                    resize: 'vertical',
-                  }}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={submitting}
-                style={{
-                  padding: '8px 16px',
-                  background: submitting ? '#ccc' : '#667eea',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: submitting ? 'not-allowed' : 'pointer',
-                  fontSize: '0.9rem',
-                  fontWeight: '600',
-                }}
-              >
-                {submitting ? '등록 중...' : '등록'}
-              </button>
-            </form>
-          )}
-
-          <div style={{
-            overflowX: 'auto',
-          }}>
-            <table style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-            }}>
-              <thead>
-                <tr style={{
-                  borderBottom: '2px solid #e0e0e0',
-                  background: '#f8f9fa',
-                }}>
-                  <th style={{
-                    padding: '10px',
-                    textAlign: 'left',
-                    fontWeight: '600',
-                    color: '#333',
-                    fontSize: '0.9rem',
-                  }}>
-                    회원명
-                  </th>
-                  <th style={{
-                    padding: '10px',
-                    textAlign: 'center',
-                    fontWeight: '600',
-                    color: '#333',
-                    fontSize: '0.9rem',
-                  }}>
-                    출석 상태
-                  </th>
-                  <th style={{
-                    padding: '10px',
-                    textAlign: 'left',
-                    fontWeight: '600',
-                    color: '#333',
-                    fontSize: '0.9rem',
-                  }}>
-                    메모
-                  </th>
-                  <th style={{
-                    padding: '10px',
-                    textAlign: 'center',
-                    fontWeight: '600',
-                    color: '#333',
-                    fontSize: '0.9rem',
-                  }}>
-                    관리
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {attendances.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} style={{
-                      padding: '20px',
-                      textAlign: 'center',
-                      color: '#999',
-                    }}>
-                      등록된 참석 인원이 없습니다.
-                    </td>
-                  </tr>
-                ) : (
-                  attendances.map((attendance: any) => (
-                    <tr key={attendance.id} style={{
-                      borderBottom: '1px solid #f0f0f0',
-                    }}>
-                      <td style={{
+                  등록된 회원이 없습니다.
+                </div>
+              ) : (
+                members.map((member: any) => {
+                  const checked = isMemberChecked(member.id);
+                  const isSubmitting = submitting[member.id] || false;
+                  
+                  return (
+                    <div
+                      key={member.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
                         padding: '10px',
+                        borderBottom: '1px solid #f0f0f0',
+                        cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                        opacity: isSubmitting ? 0.6 : 1,
+                      }}
+                      onClick={() => {
+                        if (!isSubmitting && !processing) {
+                          handleCheckboxChange(member.id, !checked);
+                        }
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          if (!isSubmitting && !processing) {
+                            handleCheckboxChange(member.id, e.target.checked);
+                          }
+                        }}
+                        disabled={isSubmitting || processing}
+                        style={{
+                          marginRight: '12px',
+                          width: '18px',
+                          height: '18px',
+                          cursor: (isSubmitting || processing) ? 'not-allowed' : 'pointer',
+                        }}
+                      />
+                      <span style={{
+                        fontSize: '0.95rem',
                         color: '#333',
+                        flex: 1,
                       }}>
-                        {attendance.member?.name || '회원 정보 없음'}
-                      </td>
-                      <td style={{
-                        padding: '10px',
-                        textAlign: 'center',
-                      }}>
+                        {member.name}
+                      </span>
+                      {isSubmitting && (
                         <span style={{
-                          padding: '4px 8px',
-                          background: attendance.attendanceStatus === 'attended' ? '#28a745' : 
-                                     attendance.attendanceStatus === 'late' ? '#ffc107' : '#dc3545',
-                          color: 'white',
-                          borderRadius: '4px',
                           fontSize: '0.85rem',
+                          color: '#666',
+                          marginLeft: '8px',
                         }}>
-                          {attendance.attendanceStatus === 'attended' ? '출석' : 
-                           attendance.attendanceStatus === 'late' ? '지각' : '결석'}
+                          처리 중...
                         </span>
-                      </td>
-                      <td style={{
-                        padding: '10px',
-                        color: '#666',
-                        fontSize: '0.9rem',
-                      }}>
-                        {attendance.memo || '-'}
-                      </td>
-                      <td style={{
-                        padding: '10px',
-                        textAlign: 'center',
-                      }}>
-                        <button
-                          onClick={async () => {
-                            try {
-                              setSubmitting(true);
-                              await deleteRegularMeetingAttendance(attendance.id);
-                              await loadAttendances();
-                              onUpdate();
-                            } catch (error: any) {
-                              alert(error.message || '삭제에 실패했습니다.');
-                            } finally {
-                              setSubmitting(false);
-                            }
-                          }}
-                          disabled={submitting || processing}
-                          style={{
-                            padding: '4px 8px',
-                            background: '#dc3545',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: (submitting || processing) ? 'not-allowed' : 'pointer',
-                            fontSize: '0.85rem',
-                            opacity: (submitting || processing) ? 0.6 : 1,
-                          }}
-                        >
-                          삭제
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
 
           <div style={{
             display: 'flex',
