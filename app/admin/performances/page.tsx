@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getAllPerformances, deletePerformance } from '@/lib/adminApi';
+import { getAllPerformances, getPerformanceById, deletePerformance } from '@/lib/adminApi';
 import { useAdmin } from '@/contexts/AdminContext';
 import styles from '../admin.module.css';
 
@@ -12,6 +12,15 @@ export default function PerformancesPage() {
   const { isAuthenticated, loading: authLoading } = useAdmin();
   const [performances, setPerformances] = useState<any[]>([]);
   const [selectedPerformance, setSelectedPerformance] = useState<any>(null);
+
+  const loadPerformances = useCallback(async () => {
+    try {
+      const data = await getAllPerformances();
+      setPerformances(data);
+    } catch (error) {
+      console.error('Failed to load performances:', error);
+    }
+  }, []);
 
   useEffect(() => {
     // 인증 확인 (Context에서 처리됨)
@@ -24,18 +33,9 @@ export default function PerformancesPage() {
     if (isAuthenticated) {
       loadPerformances();
     }
-  }, [isAuthenticated, authLoading]);
+  }, [isAuthenticated, authLoading, loadPerformances, router]);
 
-  const loadPerformances = async () => {
-    try {
-      const data = await getAllPerformances();
-      setPerformances(data);
-    } catch (error) {
-      console.error('Failed to load performances:', error);
-    }
-  };
-
-  const handleDelete = async (id: number, title: string) => {
+  const handleDelete = useCallback(async (id: number, title: string) => {
     if (!confirm(`정말로 "${title}" 공연을 삭제하시겠습니까?`)) {
       return;
     }
@@ -50,7 +50,22 @@ export default function PerformancesPage() {
     } catch (error: any) {
       alert(error.message || '삭제에 실패했습니다.');
     }
-  };
+  }, [loadPerformances, selectedPerformance]);
+
+  const handlePerformanceSelect = useCallback(async (performance: any) => {
+    // 목록의 performance는 sessions 정보가 없으므로, 상세 정보를 별도로 로드
+    if (!performance.sessions) {
+      try {
+        const detail = await getPerformanceById(performance.id);
+        setSelectedPerformance(detail);
+      } catch (error) {
+        console.error('Failed to load performance detail:', error);
+        setSelectedPerformance(performance);
+      }
+    } else {
+      setSelectedPerformance(performance);
+    }
+  }, []);
 
   // 인증 로딩이 완료되지 않았을 때만 로딩 화면 표시
   if (authLoading) {
@@ -131,7 +146,7 @@ export default function PerformancesPage() {
                 {performances.map((performance) => (
                   <div
                     key={performance.id}
-                    onClick={() => setSelectedPerformance(performance)}
+                    onClick={() => handlePerformanceSelect(performance)}
                     style={{
                       padding: '20px',
                       border: selectedPerformance?.id === performance.id ? '2px solid #667eea' : '1px solid #e0e0e0',
@@ -139,16 +154,6 @@ export default function PerformancesPage() {
                       background: selectedPerformance?.id === performance.id ? '#f0f4ff' : '#f9f9f9',
                       cursor: 'pointer',
                       transition: 'all 0.3s ease',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (selectedPerformance?.id !== performance.id) {
-                        e.currentTarget.style.background = '#f0f0f0';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (selectedPerformance?.id !== performance.id) {
-                        e.currentTarget.style.background = '#f9f9f9';
-                      }
                     }}
                   >
                     <div style={{
@@ -166,6 +171,7 @@ export default function PerformancesPage() {
                     }}>
                       {new Date(performance.startDate).toLocaleDateString('ko-KR')} ~ {new Date(performance.endDate).toLocaleDateString('ko-KR')}
                     </div>
+                    {performance._count && (
                     <div style={{
                       display: 'flex',
                       gap: '10px',
@@ -179,7 +185,7 @@ export default function PerformancesPage() {
                         borderRadius: '12px',
                         fontSize: '0.85rem',
                       }}>
-                        세션 {performance.sessions?.length || 0}개
+                        세션 {performance._count?.sessions || 0}개
                       </span>
                     </div>
                   </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getAllMembers, getRegularMeetingSchedules, getSameDayRentalRequests } from '@/lib/adminApi';
@@ -16,20 +16,7 @@ export default function AdminDashboard() {
     pendingRequests: 0,
   });
 
-  useEffect(() => {
-    // 인증 확인 (Context에서 처리됨)
-    if (!authLoading && !isAuthenticated) {
-      router.push('/admin/login');
-      return;
-    }
-
-    // 데이터 로딩은 백그라운드에서 처리 (즉시 UI 표시)
-    if (isAuthenticated) {
-      loadStats();
-    }
-  }, [isAuthenticated, authLoading]);
-
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       const [members, meetings, requests] = await Promise.all([
         getAllMembers(),
@@ -45,7 +32,20 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Failed to load stats:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    // 인증 확인 (Context에서 처리됨)
+    if (!authLoading && !isAuthenticated) {
+      router.push('/admin/login');
+      return;
+    }
+
+    // 데이터 로딩은 백그라운드에서 처리 (즉시 UI 표시)
+    if (isAuthenticated) {
+      loadStats();
+    }
+  }, [isAuthenticated, authLoading, loadStats, router]);
 
   const handleLogout = () => {
     localStorage.removeItem('adminToken');
@@ -157,7 +157,7 @@ export default function AdminDashboard() {
   );
 }
 
-function StatCard({ title, value, icon }: { title: string; value: number; icon: string }) {
+const StatCard = memo(function StatCard({ title, value, icon }: { title: string; value: number; icon: string }) {
   return (
     <div className={styles.statCard}>
       <div className={styles.statIcon}>{icon}</div>
@@ -167,11 +167,11 @@ function StatCard({ title, value, icon }: { title: string; value: number; icon: 
       <div className={styles.statTitle}>{title}</div>
     </div>
   );
-}
+});
 
-function MenuCard({ title, description, href, icon }: { title: string; description: string; href: string; icon: string }) {
+const MenuCard = memo(function MenuCard({ title, description, href, icon }: { title: string; description: string; href: string; icon: string }) {
   return (
-    <Link href={href} className={styles.menuCard}>
+    <Link href={href} prefetch={true} className={styles.menuCard}>
       <div className={styles.menuIcon}>{icon}</div>
       <h3 className={styles.menuTitle}>
         {title}
@@ -181,5 +181,5 @@ function MenuCard({ title, description, href, icon }: { title: string; descripti
       </p>
     </Link>
   );
-}
+});
 

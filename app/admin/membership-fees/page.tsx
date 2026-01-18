@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -35,9 +35,9 @@ export default function MembershipFeesPage() {
     if (isAuthenticated) {
       loadData();
     }
-  }, [isAuthenticated, authLoading]);
+  }, [isAuthenticated, authLoading, loadData, router]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const [policiesData, paymentsData] = await Promise.all([
         getMembershipFeePolicies(),
@@ -48,35 +48,30 @@ export default function MembershipFeesPage() {
     } catch (error) {
       console.error('Failed to load data:', error);
     }
-  };
+  }, []);
 
-  const showModal = (type: 'info' | 'confirm' | 'error', title: string, message: string, onConfirm?: () => void) => {
+  const showModal = useCallback((type: 'info' | 'confirm' | 'error', title: string, message: string, onConfirm?: () => void) => {
     setModalType(type);
     setModalTitle(title);
     setModalMessage(message);
     setModalOnConfirm(onConfirm || null);
     setModalOpen(true);
-  };
+  }, []);
 
-  const closeModal = () => {
+  const closeModal = useCallback(() => {
     setModalOpen(false);
     setModalOnConfirm(null);
     setDeleteTarget(null);
-  };
+  }, []);
 
-  const handleModalConfirm = () => {
+  const handleModalConfirm = useCallback(() => {
     if (modalOnConfirm) {
       modalOnConfirm();
     }
     closeModal();
-  };
+  }, [modalOnConfirm, closeModal]);
 
-  const handleDeleteClick = (id: number, name: string) => {
-    setDeleteTarget({ id, name });
-    showModal('confirm', '삭제 확인', `정말로 "${name}" 회비 정책을 삭제하시겠습니까?`, () => handleDelete(id, name));
-  };
-
-  const handleDelete = async (id: number, name: string) => {
+  const handleDelete = useCallback(async (id: number, name: string) => {
     try {
       setProcessing(true);
       await deleteMembershipFeePolicy(id);
@@ -86,7 +81,12 @@ export default function MembershipFeesPage() {
     } finally {
       setProcessing(false);
     }
-  };
+  }, [loadData, showModal]);
+
+  const handleDeleteClick = useCallback((id: number, name: string) => {
+    setDeleteTarget({ id, name });
+    showModal('confirm', '삭제 확인', `정말로 "${name}" 회비 정책을 삭제하시겠습니까?`, () => handleDelete(id, name));
+  }, [showModal, handleDelete]);
 
   // 인증 로딩이 완료되지 않았을 때만 로딩 화면 표시
   if (authLoading) {

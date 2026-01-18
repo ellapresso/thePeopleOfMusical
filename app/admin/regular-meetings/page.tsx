@@ -241,7 +241,7 @@ export default function RegularMeetingsPage() {
                 </thead>
                 <tbody>
                   {schedules.map((schedule) => {
-                    const attendeeCount = schedule.attendances?.length || 0;
+                    const attendeeCount = schedule._count?.attendances || 0;
                     return (
                       <tr key={schedule.id} style={{
                         borderBottom: '1px solid #f0f0f0',

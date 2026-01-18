@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getAllMembers } from '@/lib/adminApi';
@@ -14,6 +14,15 @@ export default function MembersPage() {
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
+  const loadMembers = useCallback(async () => {
+    try {
+      const data = await getAllMembers();
+      setMembers(data);
+    } catch (error) {
+      console.error('Failed to load members:', error);
+    }
+  }, []);
+
   useEffect(() => {
     // 인증 확인 (Context에서 처리됨)
     if (!authLoading && !isAuthenticated) {
@@ -25,20 +34,19 @@ export default function MembersPage() {
     if (isAuthenticated) {
       loadMembers();
     }
-  }, [isAuthenticated, authLoading]);
+  }, [isAuthenticated, authLoading, loadMembers, router]);
 
-  const loadMembers = async () => {
-    try {
-      const data = await getAllMembers();
-      setMembers(data);
-    } catch (error) {
-      console.error('Failed to load members:', error);
-    }
-  };
+  const filteredMembers = useMemo(() => {
+    if (!searchQuery.trim()) return members;
+    const query = searchQuery.toLowerCase();
+    return members.filter(member =>
+      member.name.toLowerCase().includes(query)
+    );
+  }, [members, searchQuery]);
 
-  const filteredMembers = members.filter(member =>
-    member.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleMemberSelect = useCallback((member: any) => {
+    setSelectedMember(member);
+  }, []);
 
   // 인증 로딩이 완료되지 않았을 때만 로딩 화면 표시
   if (authLoading) {
@@ -65,6 +73,7 @@ export default function MembersPage() {
           <div className={styles.headerActions}>
             <Link
               href="/admin/dashboard"
+              prefetch={true}
               style={{
                 padding: '10px 20px',
                 background: '#f5f5f5',
@@ -78,6 +87,7 @@ export default function MembersPage() {
             </Link>
             <Link
               href="/admin/members/create"
+              prefetch={true}
               style={{
                 padding: '10px 20px',
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -139,7 +149,7 @@ export default function MembersPage() {
                 {filteredMembers.map((member) => (
                   <div
                     key={member.id}
-                    onClick={() => setSelectedMember(member)}
+                    onClick={() => handleMemberSelect(member)}
                     style={{
                       padding: '15px',
                       border: selectedMember?.id === member.id ? '2px solid #667eea' : '1px solid #e0e0e0',
@@ -239,6 +249,7 @@ export default function MembersPage() {
               }}>
                 <Link
                   href={`/admin/members/${selectedMember.id}/edit`}
+                  prefetch={true}
                   style={{
                     flex: 1,
                     padding: '12px',
@@ -283,7 +294,7 @@ export default function MembersPage() {
   );
 }
 
-function DetailRow({ label, value }: { label: string; value: string }) {
+const DetailRow = memo(function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div style={{
       display: 'flex',
@@ -295,5 +306,5 @@ function DetailRow({ label, value }: { label: string; value: string }) {
       <span style={{ color: '#333', fontSize: '0.9rem', fontWeight: '500' }}>{value}</span>
     </div>
   );
-}
+});
 

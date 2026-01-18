@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getRentalSchedules, getRentalPayments, createRentalSchedule, updateRentalSchedule, deleteRentalSchedule, getAllMembers } from '@/lib/adminApi';
@@ -66,7 +66,7 @@ export default function RentalsPage() {
   }, [showMemberSearch]);
 
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const [schedulesData, paymentsData, membersData] = await Promise.all([
         getRentalSchedules(),
@@ -79,30 +79,34 @@ export default function RentalsPage() {
     } catch (error) {
       console.error('Failed to load data:', error);
     }
-  };
+  }, []);
 
   // 선택된 날짜의 스케줄 필터링
-  const filteredSchedules = selectedDate
-    ? schedules.filter(schedule => {
-        const scheduleDate = new Date(schedule.startDatetime).toISOString().split('T')[0];
-        return scheduleDate === selectedDate;
-      })
-    : schedules;
+  const filteredSchedules = useMemo(() => {
+    if (!selectedDate) return schedules;
+    return schedules.filter(schedule => {
+      const scheduleDate = new Date(schedule.startDatetime).toISOString().split('T')[0];
+      return scheduleDate === selectedDate;
+    });
+  }, [schedules, selectedDate]);
 
   // 캘린더 날짜 계산
-  const today = new Date();
-  const firstDay = new Date(currentYear, currentMonth, 1);
-  const lastDay = new Date(currentYear, currentMonth + 1, 0);
-  const daysInMonth = lastDay.getDate();
-  const startingDayOfWeek = firstDay.getDay();
+  const calendarData = useMemo(() => {
+    const today = new Date();
+    const firstDay = new Date(currentYear, currentMonth, 1);
+    const lastDay = new Date(currentYear, currentMonth + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+    return { today, firstDay, lastDay, daysInMonth, startingDayOfWeek };
+  }, [currentYear, currentMonth]);
 
-  const getSchedulesForDate = (date: Date) => {
+  const getSchedulesForDate = useCallback((date: Date) => {
     const dateStr = date.toISOString().split('T')[0];
     return schedules.filter(schedule => {
       const scheduleDate = new Date(schedule.startDatetime).toISOString().split('T')[0];
       return scheduleDate === dateStr;
     });
-  };
+  }, [schedules]);
 
   const formatTimeRange = (schedule: any) => {
     const start = new Date(schedule.startDatetime);
@@ -425,16 +429,16 @@ export default function RentalsPage() {
               gap: '10px',
             }}>
               {/* 빈 칸 (첫 주 시작일 전) */}
-              {Array.from({ length: startingDayOfWeek }).map((_, i) => (
+              {Array.from({ length: calendarData.startingDayOfWeek }).map((_, i) => (
                 <div key={`empty-${i}`} style={{ minHeight: '100px' }} />
               ))}
 
               {/* 날짜 칸 */}
-              {Array.from({ length: daysInMonth }).map((_, i) => {
+              {Array.from({ length: calendarData.daysInMonth }).map((_, i) => {
                 const date = new Date(currentYear, currentMonth, i + 1);
                 const dateStr = date.toISOString().split('T')[0];
                 const daySchedules = getSchedulesForDate(date);
-                const isToday = dateStr === today.toISOString().split('T')[0];
+                const isToday = dateStr === calendarData.today.toISOString().split('T')[0];
                 const isSelected = dateStr === selectedDate;
 
                 return (

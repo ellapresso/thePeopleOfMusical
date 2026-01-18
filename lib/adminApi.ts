@@ -1,3 +1,6 @@
+import { getCachedData, setCachedData, clearCache, invalidateCachePattern } from './apiCache';
+import { dedupeRequest } from './apiRequestDedupe';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
 // 토큰 가져오기
@@ -9,37 +12,67 @@ const getToken = () => {
 };
 
 // API 요청 헬퍼
-const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
-  const token = getToken();
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string>),
+const apiRequest = async (endpoint: string, options: RequestInit = {}, useCache: boolean = false) => {
+  const cacheKey = options.method === 'GET' && useCache ? `api:${endpoint}` : null;
+  
+  // GET 요청이고 캐시가 활성화된 경우 캐시 확인
+  if (cacheKey) {
+    const cached = getCachedData(cacheKey);
+    if (cached !== null) {
+      return cached;
+    }
+  }
+
+  // GET 요청이고 캐시가 활성화된 경우 요청 중복 방지
+  const requestKey = options.method === 'GET' && useCache ? `request:${endpoint}` : null;
+  
+  const executeRequest = async () => {
+    const token = getToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(options.headers as Record<string, string>),
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers,
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        // 인증 실패 시 로그인 페이지로
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('adminToken');
+          clearCache(); // 인증 실패 시 캐시 클리어
+          window.location.href = '/admin/login';
+        }
+        throw new Error('인증이 필요합니다.');
+      }
+      const error = await response.json().catch(() => ({ error: '요청 실패' }));
+      throw new Error(error.error || '요청 실패');
+    }
+
+    const data = await response.json();
+    
+    // GET 요청이고 캐시가 활성화된 경우 캐시에 저장
+    if (cacheKey && options.method !== 'POST' && options.method !== 'PUT' && options.method !== 'DELETE') {
+      setCachedData(cacheKey, data);
+    }
+
+    return data;
   };
 
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+  // 요청 중복 방지 적용
+  if (requestKey) {
+    return dedupeRequest(requestKey, executeRequest);
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      // 인증 실패 시 로그인 페이지로
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('adminToken');
-        window.location.href = '/admin/login';
-      }
-      throw new Error('인증이 필요합니다.');
-    }
-    const error = await response.json().catch(() => ({ error: '요청 실패' }));
-    throw new Error(error.error || '요청 실패');
-  }
-
-  return response.json();
+  return executeRequest();
 };
 
 // 관리자 정보
@@ -54,14 +87,20 @@ export const deleteAdmin = (id: number) =>
   apiRequest(`/admin/${id}`, { method: 'DELETE' });
 
 // 멤버 관리
-export const getAllMembers = () => apiRequest('/members');
+export const getAllMembers = () => apiRequest('/members', {}, true);
 export const getMemberById = (id: number) => apiRequest(`/members/${id}`);
-export const createMember = (data: any) =>
-  apiRequest('/members', { method: 'POST', body: JSON.stringify(data) });
-export const updateMember = (id: number, data: any) =>
-  apiRequest(`/members/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-export const deleteMember = (id: number) =>
-  apiRequest(`/members/${id}`, { method: 'DELETE' });
+export const createMember = async (data: any) => {
+  invalidateCachePattern('/members');
+  return apiRequest('/members', { method: 'POST', body: JSON.stringify(data) });
+};
+export const updateMember = async (id: number, data: any) => {
+  invalidateCachePattern('/members');
+  return apiRequest(`/members/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+};
+export const deleteMember = async (id: number) => {
+  invalidateCachePattern('/members');
+  return apiRequest(`/members/${id}`, { method: 'DELETE' });
+};
 
 // 단원 레벨
 export const getAllMemberLevels = () => apiRequest('/member-levels');
@@ -84,13 +123,19 @@ export const deleteRole = (id: number) =>
   apiRequest(`/roles/${id}`, { method: 'DELETE' });
 
 // 정기모임 스케줄
-export const getRegularMeetingSchedules = () => apiRequest('/regular-meeting-schedules');
-export const createRegularMeetingSchedule = (data: any) => 
-  apiRequest('/regular-meeting-schedules', { method: 'POST', body: JSON.stringify(data) });
-export const updateRegularMeetingSchedule = (id: number, data: any) =>
-  apiRequest(`/regular-meeting-schedules/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-export const deleteRegularMeetingSchedule = (id: number) =>
-  apiRequest(`/regular-meeting-schedules/${id}`, { method: 'DELETE' });
+export const getRegularMeetingSchedules = () => apiRequest('/regular-meeting-schedules', {}, true);
+export const createRegularMeetingSchedule = async (data: any) => {
+  invalidateCachePattern('/regular-meeting-schedules');
+  return apiRequest('/regular-meeting-schedules', { method: 'POST', body: JSON.stringify(data) });
+};
+export const updateRegularMeetingSchedule = async (id: number, data: any) => {
+  invalidateCachePattern('/regular-meeting-schedules');
+  return apiRequest(`/regular-meeting-schedules/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+};
+export const deleteRegularMeetingSchedule = async (id: number) => {
+  invalidateCachePattern('/regular-meeting-schedules');
+  return apiRequest(`/regular-meeting-schedules/${id}`, { method: 'DELETE' });
+};
 
 // 정기모임 참석
 export const getRegularMeetingAttendances = (params?: { regularMeetingScheduleId?: number; memberId?: number }) => {
@@ -123,14 +168,20 @@ export const approveSameDayRentalRequest = (id: number, data?: any) =>
   apiRequest(`/same-day-rental-requests/${id}/approve`, { method: 'POST', body: JSON.stringify(data || {}) });
 
 // 대관 스케줄
-export const getRentalSchedules = () => apiRequest('/rental-schedules');
+export const getRentalSchedules = () => apiRequest('/rental-schedules', {}, true);
 export const getRentalScheduleById = (id: number) => apiRequest(`/rental-schedules/${id}`);
-export const createRentalSchedule = (data: any) =>
-  apiRequest('/rental-schedules', { method: 'POST', body: JSON.stringify(data) });
-export const updateRentalSchedule = (id: number, data: any) =>
-  apiRequest(`/rental-schedules/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-export const deleteRentalSchedule = (id: number) =>
-  apiRequest(`/rental-schedules/${id}`, { method: 'DELETE' });
+export const createRentalSchedule = async (data: any) => {
+  invalidateCachePattern('/rental-schedules');
+  return apiRequest('/rental-schedules', { method: 'POST', body: JSON.stringify(data) });
+};
+export const updateRentalSchedule = async (id: number, data: any) => {
+  invalidateCachePattern('/rental-schedules');
+  return apiRequest(`/rental-schedules/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+};
+export const deleteRentalSchedule = async (id: number) => {
+  invalidateCachePattern('/rental-schedules');
+  return apiRequest(`/rental-schedules/${id}`, { method: 'DELETE' });
+};
 
 // 회비 납부
 export const getMembershipFeePayments = (params?: any) => {
@@ -153,14 +204,20 @@ export const getRentalPayments = (params?: any) => {
 };
 
 // 회비 정책
-export const getMembershipFeePolicies = () => apiRequest('/membership-fee-policies');
+export const getMembershipFeePolicies = () => apiRequest('/membership-fee-policies', {}, true);
 export const getMembershipFeePolicyById = (id: number) => apiRequest(`/membership-fee-policies/${id}`);
-export const createMembershipFeePolicy = (data: any) =>
-  apiRequest('/membership-fee-policies', { method: 'POST', body: JSON.stringify(data) });
-export const updateMembershipFeePolicy = (id: number, data: any) =>
-  apiRequest(`/membership-fee-policies/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-export const deleteMembershipFeePolicy = (id: number) =>
-  apiRequest(`/membership-fee-policies/${id}`, { method: 'DELETE' });
+export const createMembershipFeePolicy = async (data: any) => {
+  invalidateCachePattern('/membership-fee-policies');
+  return apiRequest('/membership-fee-policies', { method: 'POST', body: JSON.stringify(data) });
+};
+export const updateMembershipFeePolicy = async (id: number, data: any) => {
+  invalidateCachePattern('/membership-fee-policies');
+  return apiRequest(`/membership-fee-policies/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+};
+export const deleteMembershipFeePolicy = async (id: number) => {
+  invalidateCachePattern('/membership-fee-policies');
+  return apiRequest(`/membership-fee-policies/${id}`, { method: 'DELETE' });
+};
 
 // 회비 납부
 export const createMembershipFeePayment = (data: any) =>
@@ -169,12 +226,18 @@ export const updateMembershipFeePayment = (id: number, data: any) =>
   apiRequest(`/membership-fee-payments/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 
 // 공연 정보
-export const getAllPerformances = () => apiRequest('/performances');
+export const getAllPerformances = () => apiRequest('/performances', {}, true);
 export const getPerformanceById = (id: number) => apiRequest(`/performances/${id}`);
-export const createPerformance = (data: any) =>
-  apiRequest('/performances', { method: 'POST', body: JSON.stringify(data) });
-export const updatePerformance = (id: number, data: any) =>
-  apiRequest(`/performances/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-export const deletePerformance = (id: number) =>
-  apiRequest(`/performances/${id}`, { method: 'DELETE' });
+export const createPerformance = async (data: any) => {
+  invalidateCachePattern('/performances');
+  return apiRequest('/performances', { method: 'POST', body: JSON.stringify(data) });
+};
+export const updatePerformance = async (id: number, data: any) => {
+  invalidateCachePattern('/performances');
+  return apiRequest(`/performances/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+};
+export const deletePerformance = async (id: number) => {
+  invalidateCachePattern('/performances');
+  return apiRequest(`/performances/${id}`, { method: 'DELETE' });
+};
 

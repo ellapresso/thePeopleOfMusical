@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { getAdminMe } from '@/lib/adminApi';
 
 interface Admin {
@@ -25,7 +25,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const [currentAdmin, setCurrentAdmin] = useState<Admin | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const refreshAdmin = async () => {
+  const refreshAdmin = useCallback(async () => {
     try {
       const adminData = await getAdminMe();
       setCurrentAdmin(adminData);
@@ -35,7 +35,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     refreshAdmin();
