@@ -145,6 +145,12 @@ export default function AdminDashboard() {
             href="/admin/performances"
             icon="🎭"
           />
+          <MenuCard
+            title="정기 모임"
+            description="정기 모임 일정 및 참석 관리"
+            href="/admin/regular-meetings"
+            icon="📅"
+          />
         </div>
       </div>
     </div>
