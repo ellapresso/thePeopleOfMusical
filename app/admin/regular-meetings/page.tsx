@@ -85,7 +85,7 @@ export default function RegularMeetingsPage() {
         if (selectedSchedule) {
           await loadScheduleAttendances(selectedSchedule.id);
         }
-        onUpdate(); // 상위 컴포넌트 업데이트를 위한 콜백 호출 (실제로는 모달 내부에서 처리)
+        loadSchedules(); // 목록 새로고침
       }
     } catch (error: any) {
       showModal('error', '오류', error.message || '삭제에 실패했습니다.');

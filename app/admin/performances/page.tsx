@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getAllPerformances, getPerformanceById, deletePerformance } from '@/lib/adminApi';
@@ -172,22 +172,23 @@ export default function PerformancesPage() {
                       {new Date(performance.startDate).toLocaleDateString('ko-KR')} ~ {new Date(performance.endDate).toLocaleDateString('ko-KR')}
                     </div>
                     {performance._count && (
-                    <div style={{
-                      display: 'flex',
-                      gap: '10px',
-                      flexWrap: 'wrap',
-                      marginTop: '10px',
-                    }}>
-                      <span style={{
-                        padding: '4px 12px',
-                        background: '#667eea',
-                        color: 'white',
-                        borderRadius: '12px',
-                        fontSize: '0.85rem',
+                      <div style={{
+                        display: 'flex',
+                        gap: '10px',
+                        flexWrap: 'wrap',
+                        marginTop: '10px',
                       }}>
-                        세션 {performance._count?.sessions || 0}개
-                      </span>
-                    </div>
+                        <span style={{
+                          padding: '4px 12px',
+                          background: '#667eea',
+                          color: 'white',
+                          borderRadius: '12px',
+                          fontSize: '0.85rem',
+                        }}>
+                          세션 {performance._count?.sessions || 0}개
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

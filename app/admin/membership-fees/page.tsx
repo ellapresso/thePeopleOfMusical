@@ -24,19 +24,6 @@ export default function MembershipFeesPage() {
   const [modalOnConfirm, setModalOnConfirm] = useState<(() => void) | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
 
-  useEffect(() => {
-    // 인증 확인 (Context에서 처리됨)
-    if (!authLoading && !isAuthenticated) {
-      router.push('/admin/login');
-      return;
-    }
-
-    // 데이터 로딩은 백그라운드에서 처리 (즉시 UI 표시)
-    if (isAuthenticated) {
-      loadData();
-    }
-  }, [isAuthenticated, authLoading, loadData, router]);
-
   const loadData = useCallback(async () => {
     try {
       const [policiesData, paymentsData] = await Promise.all([
@@ -49,6 +36,19 @@ export default function MembershipFeesPage() {
       console.error('Failed to load data:', error);
     }
   }, []);
+
+  useEffect(() => {
+    // 인증 확인 (Context에서 처리됨)
+    if (!authLoading && !isAuthenticated) {
+      router.push('/admin/login');
+      return;
+    }
+
+    // 데이터 로딩은 백그라운드에서 처리 (즉시 UI 표시)
+    if (isAuthenticated) {
+      loadData();
+    }
+  }, [isAuthenticated, authLoading, loadData, router]);
 
   const showModal = useCallback((type: 'info' | 'confirm' | 'error', title: string, message: string, onConfirm?: () => void) => {
     setModalType(type);
@@ -610,7 +610,7 @@ function PaymentProcessingTab({ policies, showModal, processing, setProcessing, 
       setLoading(true);
       const allMembers = await getAllMembers();
       // 회비 0원 이상 레벨의 회원만 필터링
-      const filteredMembers = allMembers.filter(m => 
+      const filteredMembers = allMembers.filter((m: any) =>
         validPolicyLevelIds.includes(m.memberLevelId)
       );
       setMembers(filteredMembers);
