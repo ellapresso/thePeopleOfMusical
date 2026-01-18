@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import * as Tabs from '@radix-ui/react-tabs';
 import * as Dialog from '@radix-ui/react-dialog';
-import { getAdminMe, getAllAdmins, deleteAdmin, getAllMemberLevels, createMemberLevel, updateMemberLevel, deleteMemberLevel } from '@/lib/adminApi';
+import { getAdminMe, getAllAdmins, deleteAdmin, getAllMemberLevels, createMemberLevel, updateMemberLevel, deleteMemberLevel, getAllRoles, createRole, updateRole, deleteRole } from '@/lib/adminApi';
 import styles from '../admin.module.css';
 
 export default function AdminsPage() {
@@ -15,10 +15,14 @@ export default function AdminsPage() {
   const [activeTab, setActiveTab] = useState('admins');
   const [admins, setAdmins] = useState<any[]>([]);
   const [memberLevels, setMemberLevels] = useState<any[]>([]);
+  const [roles, setRoles] = useState<any[]>([]);
   const [currentAdmin, setCurrentAdmin] = useState<any>(null);
   const [editingLevel, setEditingLevel] = useState<any>(null);
+  const [editingRole, setEditingRole] = useState<any>(null);
   const [showLevelForm, setShowLevelForm] = useState(false);
+  const [showRoleForm, setShowRoleForm] = useState(false);
   const [levelFormData, setLevelFormData] = useState({ name: '', description: '' });
+  const [roleFormData, setRoleFormData] = useState({ code: '', name: '', description: '' });
   
   // 모달 상태
   const [modalOpen, setModalOpen] = useState(false);
@@ -26,18 +30,28 @@ export default function AdminsPage() {
   const [modalTitle, setModalTitle] = useState('');
   const [modalMessage, setModalMessage] = useState('');
   const [modalOnConfirm, setModalOnConfirm] = useState<(() => void) | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<{ type: 'admin' | 'level'; id: number; name: string; loginId?: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'admin' | 'level' | 'role'; id: number; name: string; loginId?: string } | null>(null);
 
   useEffect(() => {
-    checkAuth();
-    loadAdmins();
-    loadMemberLevels();
+    const initialize = async () => {
+      await checkAuth();
+      await Promise.all([
+        loadAdmins(),
+        loadMemberLevels(),
+      ]);
+    };
+    initialize();
   }, []);
+
 
   const checkAuth = async () => {
     try {
       const adminData = await getAdminMe();
       setCurrentAdmin(adminData);
+      // 시스템 관리자인 경우 역할 목록도 로드
+      if (adminData?.adminType === 'SYSTEM') {
+        loadRoles();
+      }
     } catch (error) {
       router.push('/admin/login');
     } finally {
@@ -66,6 +80,19 @@ export default function AdminsPage() {
     } catch (error) {
       console.error('Failed to load member levels:', error);
       showModal('error', '오류', '단원 레벨 목록을 불러오는데 실패했습니다.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const loadRoles = async () => {
+    try {
+      setProcessing(true);
+      const data = await getAllRoles();
+      setRoles(data);
+    } catch (error) {
+      console.error('Failed to load roles:', error);
+      showModal('error', '오류', '역할 목록을 불러오는데 실패했습니다.');
     } finally {
       setProcessing(false);
     }
@@ -172,6 +199,63 @@ export default function AdminsPage() {
     setLevelFormData({ name: '', description: '' });
   };
 
+  const handleRoleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setProcessing(true);
+      if (editingRole) {
+        await updateRole(editingRole.id, roleFormData);
+        showModal('info', '완료', '역할이 수정되었습니다.', () => {
+          setShowRoleForm(false);
+          setEditingRole(null);
+          setRoleFormData({ code: '', name: '', description: '' });
+          loadRoles();
+        });
+      } else {
+        await createRole(roleFormData);
+        showModal('info', '완료', '역할이 등록되었습니다.', () => {
+          setShowRoleForm(false);
+          setEditingRole(null);
+          setRoleFormData({ code: '', name: '', description: '' });
+          loadRoles();
+        });
+      }
+    } catch (error: any) {
+      showModal('error', '오류', error.message || '등록/수정에 실패했습니다.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleRoleEdit = (role: any) => {
+    setEditingRole(role);
+    setRoleFormData({ code: role.code, name: role.name, description: role.description || '' });
+    setShowRoleForm(true);
+  };
+
+  const handleRoleDeleteClick = (id: number, name: string) => {
+    setDeleteTarget({ type: 'role', id, name });
+    showModal('confirm', '삭제 확인', `정말로 "${name}" 역할을 삭제하시겠습니까?\n\n주의: 해당 역할을 사용하는 공연 멤버가 있으면 삭제할 수 없습니다.`, () => handleRoleDelete(id, name));
+  };
+
+  const handleRoleDelete = async (id: number, name: string) => {
+    try {
+      setProcessing(true);
+      await deleteRole(id);
+      showModal('info', '완료', '역할이 삭제되었습니다.', () => loadRoles());
+    } catch (error: any) {
+      showModal('error', '오류', error.message || '삭제에 실패했습니다.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleRoleCancel = () => {
+    setShowRoleForm(false);
+    setEditingRole(null);
+    setRoleFormData({ code: '', name: '', description: '' });
+  };
+
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -267,6 +351,27 @@ export default function AdminsPage() {
                 + 단원 레벨 등록
               </button>
             )}
+            {activeTab === 'roles' && !showRoleForm && currentAdmin?.adminType === 'SYSTEM' && (
+              <button
+                onClick={() => {
+                  setEditingRole(null);
+                  setRoleFormData({ code: '', name: '', description: '' });
+                  setShowRoleForm(true);
+                }}
+                style={{
+                  padding: '10px 20px',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                }}
+              >
+                + 역할 등록
+              </button>
+            )}
           </div>
         </div>
 
@@ -310,6 +415,24 @@ export default function AdminsPage() {
             >
               단원 레벨 관리
             </Tabs.Trigger>
+            {currentAdmin?.adminType === 'SYSTEM' && (
+              <Tabs.Trigger
+                value="roles"
+                style={{
+                  padding: '12px 24px',
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: activeTab === 'roles' ? '3px solid #667eea' : '3px solid transparent',
+                  color: activeTab === 'roles' ? '#667eea' : '#666',
+                  fontWeight: activeTab === 'roles' ? '600' : '400',
+                  cursor: 'pointer',
+                  fontSize: '1rem',
+                  transition: 'all 0.2s',
+                }}
+              >
+                역할 관리
+              </Tabs.Trigger>
+            )}
           </Tabs.List>
 
           {/* 관리자 계정 관리 탭 */}
@@ -619,6 +742,215 @@ export default function AdminsPage() {
               )}
             </div>
           </Tabs.Content>
+
+          {/* 역할 관리 탭 (시스템 관리자만) */}
+          {currentAdmin?.adminType === 'SYSTEM' && (
+            <Tabs.Content value="roles">
+              <div style={{
+                background: 'white',
+                borderRadius: '16px',
+                padding: '30px',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+              }}>
+                {showRoleForm ? (
+                  <form onSubmit={handleRoleSubmit}>
+                    <h3 style={{ marginBottom: '20px', fontSize: '1.3rem', fontWeight: '600', color: '#333' }}>
+                      {editingRole ? '역할 수정' : '역할 등록'}
+                    </h3>
+                    <div style={{ display: 'grid', gap: '20px', marginBottom: '20px' }}>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', color: '#333' }}>
+                          코드 <span style={{ color: '#dc3545' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={roleFormData.code}
+                          onChange={(e) => setRoleFormData({ ...roleFormData, code: e.target.value.toUpperCase() })}
+                          required
+                          disabled={!!editingRole}
+                          placeholder="예: ACTOR, STAFF, MANAGEMENT"
+                          style={{
+                            width: '100%',
+                            padding: '10px',
+                            border: '1px solid #ddd',
+                            borderRadius: '8px',
+                            fontSize: '0.9rem',
+                            backgroundColor: editingRole ? '#f5f5f5' : 'white',
+                          }}
+                        />
+                        <small style={{ color: '#666', fontSize: '0.85rem', marginTop: '5px', display: 'block' }}>
+                          {editingRole ? '코드는 수정할 수 없습니다.' : '영문 대문자로 입력하세요.'}
+                        </small>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', color: '#333' }}>
+                          이름 <span style={{ color: '#dc3545' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={roleFormData.name}
+                          onChange={(e) => setRoleFormData({ ...roleFormData, name: e.target.value })}
+                          required
+                          placeholder="예: 배우, 스태프, 관리"
+                          style={{
+                            width: '100%',
+                            padding: '10px',
+                            border: '1px solid #ddd',
+                            borderRadius: '8px',
+                            fontSize: '0.9rem',
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', color: '#333' }}>
+                          설명
+                        </label>
+                        <textarea
+                          value={roleFormData.description}
+                          onChange={(e) => setRoleFormData({ ...roleFormData, description: e.target.value })}
+                          rows={3}
+                          style={{
+                            width: '100%',
+                            padding: '10px',
+                            border: '1px solid #ddd',
+                            borderRadius: '8px',
+                            fontSize: '0.9rem',
+                            resize: 'vertical',
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                      <button
+                        type="button"
+                        onClick={handleRoleCancel}
+                        style={{
+                          padding: '10px 20px',
+                          background: '#f5f5f5',
+                          color: '#333',
+                          border: 'none',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          fontSize: '0.9rem',
+                        }}
+                      >
+                        취소
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={processing}
+                        style={{
+                          padding: '10px 20px',
+                          background: '#667eea',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '8px',
+                          cursor: processing ? 'not-allowed' : 'pointer',
+                          fontSize: '0.9rem',
+                          fontWeight: '600',
+                          opacity: processing ? 0.6 : 1,
+                        }}
+                      >
+                        {editingRole ? '수정' : '등록'}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <>
+                    {roles.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
+                        등록된 역할이 없습니다.
+                      </div>
+                    ) : (
+                      <div style={{
+                        display: 'grid',
+                        gap: '15px',
+                      }}>
+                        {roles.map((role) => (
+                          <div
+                            key={role.id}
+                            style={{
+                              padding: '20px',
+                              border: '1px solid #e0e0e0',
+                              borderRadius: '8px',
+                              background: '#f9f9f9',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                              gap: '15px',
+                            }}
+                          >
+                            <div style={{ flex: 1, minWidth: '200px' }}>
+                              <div style={{
+                                fontSize: '1.2rem',
+                                fontWeight: '600',
+                                color: '#333',
+                                marginBottom: '5px',
+                              }}>
+                                {role.name}
+                              </div>
+                              <div style={{
+                                color: '#666',
+                                fontSize: '0.85rem',
+                                marginBottom: '5px',
+                              }}>
+                                코드: {role.code}
+                              </div>
+                              {role.description && (
+                                <div style={{
+                                  color: '#666',
+                                  fontSize: '0.9rem',
+                                }}>
+                                  {role.description}
+                                </div>
+                              )}
+                            </div>
+                            <div style={{
+                              display: 'flex',
+                              gap: '10px',
+                              flexWrap: 'wrap',
+                            }}>
+                              <button
+                                onClick={() => handleRoleEdit(role)}
+                                style={{
+                                  padding: '8px 16px',
+                                  background: '#667eea',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '8px',
+                                  cursor: 'pointer',
+                                  fontSize: '0.9rem',
+                                }}
+                              >
+                                수정
+                              </button>
+                              <button
+                                onClick={() => handleRoleDeleteClick(role.id, role.name)}
+                                disabled={processing}
+                                style={{
+                                  padding: '8px 16px',
+                                  background: '#dc3545',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '8px',
+                                  cursor: processing ? 'not-allowed' : 'pointer',
+                                  fontSize: '0.9rem',
+                                  opacity: processing ? 0.6 : 1,
+                                }}
+                              >
+                                삭제
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </Tabs.Content>
+          )}
         </Tabs.Root>
       </div>
 

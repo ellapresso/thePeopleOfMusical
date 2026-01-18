@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getAdminMe, createPerformance } from '@/lib/adminApi';
+import { getAdminMe, createPerformance, getAllMembers, getAllRoles } from '@/lib/adminApi';
 import styles from '../../admin.module.css';
 import formStyles from './create.module.css';
 
@@ -19,12 +19,30 @@ export default function CreatePerformancePage() {
     startDate: '',
     endDate: '',
   });
-  const [sessions, setSessions] = useState<Array<{ sessionDate: string; sessionTime: string; note: string }>>([
-    { sessionDate: '', sessionTime: '', note: '' },
+  const [sessions, setSessions] = useState<Array<{ 
+    sessionDate: string; 
+    sessionTime: string; 
+    note: string;
+    members: Array<{ memberId: string; roleId: string; characterName: string }>;
+  }>>([
+    { sessionDate: '', sessionTime: '', note: '', members: [] },
   ]);
+  
+  const [members, setMembers] = useState<any[]>([]);
+  const [roles, setRoles] = useState<any[]>([]);
+  // 각 배우 입력별 검색 상태 관리: "sessionIndex-memberIndex" 형식의 키
+  const [memberSearchStates, setMemberSearchStates] = useState<Record<string, {
+    query: string;
+    results: any[];
+    showResults: boolean;
+  }>>({});
 
   useEffect(() => {
-    checkAuth();
+    const initialize = async () => {
+      await checkAuth();
+      await loadMembersAndRoles();
+    };
+    initialize();
   }, []);
 
   const checkAuth = async () => {
@@ -34,6 +52,19 @@ export default function CreatePerformancePage() {
       router.push('/admin/login');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMembersAndRoles = async () => {
+    try {
+      const [membersData, rolesData] = await Promise.all([
+        getAllMembers(),
+        getAllRoles(),
+      ]);
+      setMembers(membersData);
+      setRoles(rolesData);
+    } catch (error) {
+      console.error('Failed to load members or roles:', error);
     }
   };
 
@@ -52,8 +83,121 @@ export default function CreatePerformancePage() {
   };
 
   const addSession = () => {
-    setSessions([...sessions, { sessionDate: '', sessionTime: '', note: '' }]);
+    setSessions([...sessions, { sessionDate: '', sessionTime: '', note: '', members: [] }]);
   };
+
+  const addMemberToSession = (sessionIndex: number) => {
+    const newSessions = [...sessions];
+    newSessions[sessionIndex].members.push({ memberId: '', roleId: '', characterName: '' });
+    setSessions(newSessions);
+  };
+
+  const removeMemberFromSession = (sessionIndex: number, memberIndex: number) => {
+    const newSessions = [...sessions];
+    newSessions[sessionIndex].members = newSessions[sessionIndex].members.filter((_, i) => i !== memberIndex);
+    setSessions(newSessions);
+  };
+
+  const handleMemberChange = (sessionIndex: number, memberIndex: number, field: 'memberId' | 'roleId' | 'characterName', value: string) => {
+    const newSessions = [...sessions];
+    newSessions[sessionIndex].members[memberIndex] = {
+      ...newSessions[sessionIndex].members[memberIndex],
+      [field]: value,
+    };
+    setSessions(newSessions);
+
+    // memberId가 변경되면 검색 상태 초기화
+    if (field === 'memberId' && value) {
+      const key = `${sessionIndex}-${memberIndex}`;
+      const selectedMember = members.find(m => m.id.toString() === value);
+      setMemberSearchStates(prev => ({
+        ...prev,
+        [key]: {
+          query: selectedMember?.name || '',
+          results: [],
+          showResults: false,
+        },
+      }));
+    }
+
+  };
+
+  const getSearchKey = (sessionIndex: number, memberIndex: number) => {
+    return `${sessionIndex}-${memberIndex}`;
+  };
+
+  const handleMemberSearchInputChange = (sessionIndex: number, memberIndex: number, value: string) => {
+    const key = getSearchKey(sessionIndex, memberIndex);
+    setMemberSearchStates(prev => ({
+      ...prev,
+      [key]: {
+        query: value,
+        results: prev[key]?.results || [],
+        showResults: value.length >= 2 && (prev[key]?.results?.length || 0) > 0,
+      },
+    }));
+
+    // 검색어가 2자 미만이면 결과 숨기기
+    if (value.length < 2) {
+      setMemberSearchStates(prev => ({
+        ...prev,
+        [key]: {
+          query: value,
+          results: [],
+          showResults: false,
+        },
+      }));
+    }
+  };
+
+  const handleMemberSearch = (sessionIndex: number, memberIndex: number) => {
+    const key = getSearchKey(sessionIndex, memberIndex);
+    const searchState = memberSearchStates[key];
+    if (!searchState || searchState.query.trim().length < 2) {
+      return;
+    }
+
+    const query = searchState.query.trim().toLowerCase();
+    const filtered = members.filter((member: any) =>
+      member.name.toLowerCase().includes(query)
+    );
+
+    setMemberSearchStates(prev => ({
+      ...prev,
+      [key]: {
+        query: prev[key]?.query || '',
+        results: filtered,
+        showResults: filtered.length > 0,
+      },
+    }));
+  };
+
+  const handleMemberSelect = (sessionIndex: number, memberIndex: number, member: any) => {
+    const key = getSearchKey(sessionIndex, memberIndex);
+    handleMemberChange(sessionIndex, memberIndex, 'memberId', member.id.toString());
+    setMemberSearchStates(prev => ({
+      ...prev,
+      [key]: {
+        query: member.name,
+        results: [],
+        showResults: false,
+      },
+    }));
+  };
+
+  const handleMemberSearchClear = (sessionIndex: number, memberIndex: number) => {
+    const key = getSearchKey(sessionIndex, memberIndex);
+    handleMemberChange(sessionIndex, memberIndex, 'memberId', '');
+    setMemberSearchStates(prev => ({
+      ...prev,
+      [key]: {
+        query: '',
+        results: [],
+        showResults: false,
+      },
+    }));
+  };
+
 
   const removeSession = (index: number) => {
     if (sessions.length > 1) {
@@ -84,6 +228,11 @@ export default function CreatePerformancePage() {
         return {
           sessionDatetime: sessionDatetime.toISOString(),
           note: session.note || null,
+          members: session.members.filter(m => m.memberId && m.roleId).map(m => ({
+            memberId: parseInt(m.memberId),
+            roleId: parseInt(m.roleId),
+            characterName: m.characterName || null,
+          })),
         };
       });
 
@@ -364,6 +513,233 @@ export default function CreatePerformancePage() {
                         resize: 'vertical',
                       }}
                     />
+                  </div>
+
+                  {/* 회차별 배우 정보 */}
+                  <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px solid #e0e0e0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <label style={{ fontSize: '0.9rem', fontWeight: '600', color: '#333' }}>
+                        출연 배우
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => addMemberToSession(index)}
+                        disabled={submitting || success}
+                        style={{
+                          padding: '4px 8px',
+                          background: '#28a745',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '0.75rem',
+                        }}
+                      >
+                        + 배우 추가
+                      </button>
+                    </div>
+
+                    {session.members.length === 0 ? (
+                      <div style={{ 
+                        padding: '10px', 
+                        background: '#f8f9fa', 
+                        borderRadius: '6px', 
+                        color: '#666', 
+                        fontSize: '0.85rem',
+                        textAlign: 'center',
+                      }}>
+                        배우 정보가 없습니다. 배우 추가 버튼을 클릭하여 추가하세요.
+                      </div>
+                    ) : (
+                      <div style={{ display: 'grid', gap: '10px' }}>
+                        {session.members.map((member, memberIndex) => (
+                          <div
+                            key={memberIndex}
+                            style={{
+                              padding: '10px',
+                              background: 'white',
+                              border: '1px solid #ddd',
+                              borderRadius: '6px',
+                              display: 'grid',
+                              gridTemplateColumns: '2fr 1.5fr 2fr auto',
+                              gap: '10px',
+                              alignItems: 'end',
+                            }}
+                          >
+                            <div style={{ position: 'relative' }}>
+                              <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.85rem', color: '#666' }}>
+                                배우 <span style={{ color: '#dc3545' }}>*</span>
+                              </label>
+                              <div style={{ display: 'flex', gap: '4px' }}>
+                                <input
+                                  type="text"
+                                  value={memberSearchStates[getSearchKey(index, memberIndex)]?.query || (member.memberId ? members.find(m => m.id.toString() === member.memberId)?.name || '' : '')}
+                                  onChange={(e) => handleMemberSearchInputChange(index, memberIndex, e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleMemberSearch(index, memberIndex);
+                                    }
+                                  }}
+                                  onFocus={() => {
+                                    const key = getSearchKey(index, memberIndex);
+                                    const searchState = memberSearchStates[key];
+                                    if (searchState?.query.length >= 2) {
+                                      handleMemberSearch(index, memberIndex);
+                                    }
+                                  }}
+                                  disabled={submitting || success}
+                                  placeholder="배우 이름 검색"
+                                  required={!!member.memberId}
+                                  style={{
+                                    flex: 1,
+                                    padding: '6px',
+                                    border: '1px solid #ddd',
+                                    borderRadius: '4px',
+                                    fontSize: '0.85rem',
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleMemberSearch(index, memberIndex)}
+                                  disabled={submitting || success || !memberSearchStates[getSearchKey(index, memberIndex)]?.query || memberSearchStates[getSearchKey(index, memberIndex)].query.trim().length < 2}
+                                  style={{
+                                    padding: '6px 10px',
+                                    background: memberSearchStates[getSearchKey(index, memberIndex)]?.query && memberSearchStates[getSearchKey(index, memberIndex)].query.trim().length >= 2 ? '#667eea' : '#ccc',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: memberSearchStates[getSearchKey(index, memberIndex)]?.query && memberSearchStates[getSearchKey(index, memberIndex)].query.trim().length >= 2 ? 'pointer' : 'not-allowed',
+                                    fontSize: '0.75rem',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                  title="검색"
+                                >
+                                  검색
+                                </button>
+                                {member.memberId && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMemberSearchClear(index, memberIndex)}
+                                    disabled={submitting || success}
+                                    style={{
+                                      padding: '6px 10px',
+                                      background: '#dc3545',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      cursor: 'pointer',
+                                      fontSize: '0.75rem',
+                                    }}
+                                    title="초기화"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+                              {memberSearchStates[getSearchKey(index, memberIndex)]?.showResults && memberSearchStates[getSearchKey(index, memberIndex)].results.length > 0 && (
+                                <div style={{
+                                  position: 'absolute',
+                                  top: '100%',
+                                  left: 0,
+                                  right: 0,
+                                  background: 'white',
+                                  border: '1px solid #ddd',
+                                  borderRadius: '4px',
+                                  marginTop: '2px',
+                                  maxHeight: '150px',
+                                  overflowY: 'auto',
+                                  zIndex: 1000,
+                                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                                }}>
+                                  {memberSearchStates[getSearchKey(index, memberIndex)].results.map((m) => (
+                                    <div
+                                      key={m.id}
+                                      onClick={() => handleMemberSelect(index, memberIndex, m)}
+                                      style={{
+                                        padding: '8px 10px',
+                                        cursor: 'pointer',
+                                        borderBottom: '1px solid #f0f0f0',
+                                        fontSize: '0.85rem',
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = '#f0f4ff';
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = 'white';
+                                      }}
+                                    >
+                                      {m.name}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.85rem', color: '#666' }}>
+                                역할 <span style={{ color: '#dc3545' }}>*</span>
+                              </label>
+                              <select
+                                value={member.roleId}
+                                onChange={(e) => handleMemberChange(index, memberIndex, 'roleId', e.target.value)}
+                                disabled={submitting || success}
+                                required
+                                style={{
+                                  width: '100%',
+                                  padding: '6px',
+                                  border: '1px solid #ddd',
+                                  borderRadius: '4px',
+                                  fontSize: '0.85rem',
+                                }}
+                              >
+                                <option value="">선택하세요</option>
+                                {roles.map((r) => (
+                                  <option key={r.id} value={r.id}>
+                                    {r.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.85rem', color: '#666' }}>
+                                배역이름
+                              </label>
+                              <input
+                                type="text"
+                                value={member.characterName}
+                                onChange={(e) => handleMemberChange(index, memberIndex, 'characterName', e.target.value)}
+                                disabled={submitting || success}
+                                placeholder="배역이름 (선택)"
+                                style={{
+                                  width: '100%',
+                                  padding: '6px',
+                                  border: '1px solid #ddd',
+                                  borderRadius: '4px',
+                                  fontSize: '0.85rem',
+                                }}
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeMemberFromSession(index, memberIndex)}
+                              disabled={submitting || success}
+                              style={{
+                                padding: '6px 10px',
+                                background: '#dc3545',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '0.75rem',
+                                height: 'fit-content',
+                              }}
+                            >
+                              삭제
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

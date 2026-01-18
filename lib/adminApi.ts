@@ -76,6 +76,12 @@ export const deleteMemberLevel = (id: number) =>
 // 역할
 export const getAllRoles = () => apiRequest('/roles');
 export const getRoleById = (id: number) => apiRequest(`/roles/${id}`);
+export const createRole = (data: any) =>
+  apiRequest('/roles', { method: 'POST', body: JSON.stringify(data) });
+export const updateRole = (id: number, data: any) =>
+  apiRequest(`/roles/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteRole = (id: number) =>
+  apiRequest(`/roles/${id}`, { method: 'DELETE' });
 
 // 정기모임 스케줄
 export const getRegularMeetingSchedules = () => apiRequest('/regular-meeting-schedules');
